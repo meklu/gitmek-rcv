@@ -1,0 +1,525 @@
+<?php
+/* copyleft 2013-2014 meklu (public domain)
+ *
+ * any and all re-distributions and/or modifications
+ * should or should not include this disclaimer
+ * depending on the douchiness-level of the distributor
+ * in question
+ *
+ * Handles GitHub and BitBucket POST hook functionality by passing it to irker
+ * Note that BitBucket support is more fragile.
+ */
+date_default_timezone_set("UTC");
+header("Content-Type: text/plain; charset=utf-8");
+
+/* types */
+define("INVALID_T",	-1);
+define("GITHUB_T",	1 << 0);
+define("BITBUCKET_T",	1 << 1);
+
+/* you ain't gon' configure this, foo' */
+define("IRKER_HOST", "127.0.0.1");
+define("IRKER_PORT", 6659);
+
+/* load the config */
+include("gitmek-rcv_config.php");
+
+function mekdie($str) {
+	global $logfile;
+	$success = false;
+	if ($str === 0) {
+		$success = true;
+	}
+	$ret = "===================================\n";
+	$ret.= "=== " . strftime("%Y-%m-%d %H:%M:%S (%z)") . " ===\n";
+	if ($success === true) {
+		$ret.= "=== Actually purportedly successful\n";
+	} else {
+		$ret.= "=== ERRORS GALORE!\n";
+		$ret.= "=== Message: " . $str . "\n";
+	}
+	if (isset($_SERVER["REMOTE_ADDR"])) {
+		$ret.= "IP: " . $_SERVER["REMOTE_ADDR"] . "\n";
+	}
+	if (isset($_GET) && count($_GET) > 0) {
+		$ret.= "\$_GET = " . var_export($_GET, true) . "\n";
+	}
+	if (isset($_POST) && count($_POST) > 0) {
+		$ret.= "\$_POST = " . var_export($_POST, true) . "\n";
+	}
+	if (isset($GLOBALS["payload"])) {
+		$ret.= "\$payload = " . var_export($GLOBALS["payload"], true) . "\n";
+	}
+	if (isset($GLOBALS["sockstr"])) {
+		$ret.= "\$sockstr = " . var_export($GLOBALS["sockstr"], true) . "\n";
+	}
+	if (isset($logfile) && strlen($logfile) > 0) {
+		error_log($ret, 3, $logfile);
+	}
+	die($str);
+}
+
+if (!isset($sendto) || empty($sendto)) {
+	mekdie("No send configuration!\n");
+}
+
+/* default type */
+$type = GITHUB_T;
+
+function getsend($payload) {
+	global $sendto;
+	if (isset($sendto[$payload["type"]])) {
+		$tmp = $sendto[$payload["type"]];
+		if (isset($tmp[$payload["repo"]])) {
+			return $tmp[$payload["repo"]];
+		}
+	}
+	mekdie("No send target for payload.\n");
+}
+
+if (isset($_GET["type"])) {
+	if ($_GET["type"] === "gh") {
+		$type = GITHUB_T;
+	} else if ($_GET["type"] === "bb") {
+		$type = BITBUCKET_T;
+	} else {
+		$type = INVALID_T;
+	}
+}
+
+$payload = false;
+
+if (isset($_POST["payload"])) {
+	$payload = $_POST["payload"];
+}
+
+$color = false;
+
+if (isset($_GET["color"])) {
+	$color = true;
+}
+
+/* unlimited by default, set this in the config */
+if (!isset($maxcommits)) {
+	$maxcommits = -1;
+}
+
+$commitmsglen = 120;
+
+if (isset($_GET["commitmsglen"])) {
+	$tmp = intval($_GET["commitmsglen"]);
+	if ($tmp !== false) {
+		$commitmsglen = $tmp;
+	}
+	unset($tmp);
+}
+
+$files = false;
+
+if (isset($_GET["files"])) {
+	$files = true;
+}
+
+if (php_sapi_name() === "cli") {
+	include("expayload.php");
+	$payload = $gh_ex_payload;
+	if (true) {
+		$type = BITBUCKET_T;
+		$payload = $bb_ex_payload;
+		$color = true;
+	}
+}
+
+if ($payload === false) {
+	mekdie("No payload!\n");
+}
+
+$payload = json_decode($payload, true);
+
+function chkip($base, $mask, $chk) {
+	if (strpos($mask, ".") === false) {
+		/* numeric mask */
+		$mask = (pow(2, $mask) - 1) << (32 - $mask);
+	} else {
+		/* ip mask */
+		$mask = ip2long($mask);
+	}
+	$base = ip2long($base);
+	$chk = ip2long($chk);
+	if (($base & $mask) !== ($chk & $mask)) {
+		return false;
+	}
+	return true;
+}
+
+function process_gh($payload) {
+	/* check ip */
+	if(php_sapi_name() !== "cli") {
+		# 192.30.252.0/22
+		if (chkip("192.30.252.0", 22, $_SERVER["REMOTE_ADDR"]) === false) {
+			mekdie("IP not in acceptable range!\n");
+		}
+	}
+	/* do processing */
+	$commits = $payload["commits"];
+	$retcommits = array();
+	$atotal = 0;
+	$mtotal = 0;
+	$rtotal = 0;
+	$branch = substr($payload["ref"], strpos($payload["ref"], "/", strpos($payload["ref"], "/") + 1) + 1);
+	$pusher = $payload["pusher"]["name"];
+	if ($pusher === "none") {
+		$pusher = false;
+	}
+	foreach($commits as $commit) {
+		$tmp = array();
+		$tmp["id"] = $commit["id"];
+		$tmp["message"] = $commit["message"];
+		$tmp["author"] = $commit["author"]["name"];
+		$tmp["committer"] = $commit["committer"]["name"];
+		$tmp["acount"] = count($commit["added"]);
+		$atotal += $tmp["acount"];
+		$tmp["mcount"] = count($commit["modified"]);
+		$mtotal += $tmp["mcount"];
+		$tmp["rcount"] = count($commit["removed"]);
+		$rtotal += $tmp["rcount"];
+		$tmp["ts"] = strtotime($commit["timestamp"]);
+		$retcommits[] = $tmp;
+		unset($tmp);
+	}
+	return array(
+		"type"		=> GITHUB_T,
+		"ts"		=> $payload["repository"]["pushed_at"],
+		"from"		=> $payload["before"],
+		"to"		=> $payload["after"],
+		"url"		=> $payload["repository"]["url"],
+		"compare"	=> $payload["compare"],
+		"pusher"	=> $pusher,
+		"repo"		=> $payload["repository"]["owner"]["name"] . "/" . $payload["repository"]["name"],
+		"branch"	=> $branch,
+		"commits"	=> $retcommits,
+		"acount"	=> $atotal,
+		"mcount"	=> $mtotal,
+		"rcount"	=> $rtotal,
+	);
+}
+
+function process_bb($payload) {
+	/* check ip */
+	if(php_sapi_name() !== "cli") {
+		$ips = array(
+			"207.223.240.187",
+			"207.223.240.188",
+		);
+		$isgd = false;
+		foreach ($ips as $gdip) {
+			if (chkip($gdip, 32, $_SERVER["REMOTE_ADDRESS"]) === true) {
+				$isgd = true;
+				break;
+			}
+		}
+		if ($isgd === false) {
+			mekdie("IP not in acceptable range!\n");
+		}
+	}
+	/* do processing */
+	$commits = $payload["commits"];
+	$retcommits = array();
+	$atotal = 0;
+	$mtotal = 0;
+	$rtotal = 0;
+	$from = null;
+	$to = null;
+	$from_brief = null;
+	$to_brief = null;
+	$prevparents = array();
+	/* go in reverse */
+	$commits = array_reverse($commits);
+	foreach($commits as $commit) {
+		$tmp = array();
+		/* FIXME: fix this, only listening to master for now. */
+		if (
+			$commit["branch"] !== "master" &&
+			in_array($commit["node"], $prevparents) === false
+		) {
+			continue;
+		}
+		$prevparents = $commit["parents"];
+		$tmp["id"] = $commit["raw_node"];
+		/* use abbreviated hashes for the comparison url */
+		if ($to === null) {
+			$to = $tmp["id"];
+			$to_brief = $commit["node"];
+		}
+		/* hack... */
+		$from = $commit["parents"][0];
+		$from_brief = $from;
+		$tmp["message"] = $commit["message"];
+		/* author */
+		$tmp["author"] = $commit["raw_author"];
+		$tmp["author"] = substr($tmp["author"], 0, strpos($tmp["author"], "<") - 1);
+		/* committer, not provided */
+		$tmp["committer"] = $tmp["author"];
+		/* file counts */
+		$tmp["acount"] = 0;
+		$tmp["mcount"] = 0;
+		$tmp["rcount"] = 0;
+		foreach ($commit["files"] as $file) {
+			switch ($file["type"]) {
+				case "added":
+					$tmp["acount"] += 1;
+					break;
+				case "modified":
+					$tmp["mcount"] += 1;
+					break;
+				case "removed":
+					$tmp["rcount"] += 1;
+					break;
+			}
+		}
+		$atotal += $tmp["acount"];
+		$mtotal += $tmp["mcount"];
+		$rtotal += $tmp["rcount"];
+		/* timestamp */
+		$tmp["ts"] = strtotime($commit["utctimestamp"]);
+		$retcommits[] = $tmp;
+		unset($tmp);
+	}
+	/* re-reverse commits */
+	$retcommits = array_reverse($retcommits);
+	$url = $payload["canon_url"] . $payload["repository"]["absolute_url"];
+	$compare = $url . "compare/" . $to_brief . ".." . $from_brief;
+	/* compare URL's are 'flipped', e.g. HEAD..HEAD~3
+	 * is equivalent to git's HEAD~3..HEAD */
+	return array(
+		"type"		=> BITBUCKET_T,
+		/* assume 'right now', since bb doesn't provide this info */
+		"ts"		=> time(),
+		"from"		=> $from,
+		"to"		=> $to,
+		"url"		=> $url,
+		"compare"	=> $compare,
+		/* hmph, merely a username, perhaps look into the user GET API */
+		"pusher"	=> $payload["user"],
+		"repo"		=> $payload["repository"]["owner"] . "/" . $payload["repository"]["slug"],
+		/* FIXME: fix this, only listening to master for now. */
+		"branch"	=> "master",
+		"commits"	=> $retcommits,
+		"acount"	=> $atotal,
+		"mcount"	=> $mtotal,
+		"rcount"	=> $rtotal,
+	);
+}
+
+# IRC message formatting.  For reference:
+# \002 bold   \003 color   \017 reset  \026 italic/reverse  \037 underline
+# 0 white           1 black         2 dark blue         3 dark green
+# 4 dark red        5 brownish      6 dark purple       7 orange
+# 8 yellow          9 light green   10 dark teal        11 light teal
+# 12 light blue     13 light purple 14 dark gray        15 light gray
+
+function fmt_url($str) {
+	return "\00302\037$str\017";
+}
+function fmt_repo($str) {
+	$tmp = explode("/", $str, 2);
+	$tmp[0] = fmt_name($tmp[0]);
+	$tmp[1] = "\00310". $tmp[1] ."\017";
+	$tmp = implode("/", $tmp);
+	return $tmp;
+}
+function fmt_name($str) {
+	return "\00312$str\017";
+}
+function fmt_commit_name($str) {
+	return fmt_name($str) . ":";
+}
+function fmt_commit_name_nocolor($str) {
+	return "| $str:";
+}
+function fmt_branch($str) {
+	return "\00306$str\017";
+}
+/* not used atm */
+function fmt_tag($str) {
+	return "\00306$str\017";
+}
+function fmt_hash($str) {
+	return "\00305$str\017";
+}
+function fmt_hash_nocolor($str) {
+	return "* $str";
+}
+function fmt_count($count) {
+	return "\00309$count\017";
+}
+/* this is silly */
+function fmt_passthru($str) {
+	return $str;
+}
+
+/* maxlen:
+ * 0: don't truncate
+ * -1: really don't truncate, not even newlines
+ */
+function brief_message($str, $maxlen = 120) {
+	$str = trim($str);
+	$nlpos = strpos($str, "\n");
+	if ($maxlen >= 0 && $nlpos !== false) {
+		$str = substr($str, 0, $nlpos);
+	}
+	if ($maxlen > 0 && strlen($str) > $maxlen) {
+		$str = substr($str, 0, $maxlen);
+		$str.= "…";
+	}
+	return $str;
+}
+
+function process_irker($payload) {
+	$ret = "";
+	$privmsg = "";
+	$maxcommits = $payload["maxcommits"];
+	if (count($payload["commits"]) === 0) {
+		mekdie("Not enough commits to warrant action!\n");
+	}
+	/* set up formatting functions */
+	$fmt_url = "fmt_passthru";
+	$fmt_repo = "fmt_passthru";
+	$fmt_name = "fmt_passthru";
+	$fmt_commit_name = "fmt_commit_name_nocolor";
+	$fmt_tag = "fmt_passthru";
+	$fmt_branch = "fmt_passthru";
+	$fmt_hash = "fmt_hash_nocolor";
+	$fmt_count = "fmt_passthru";
+	/* color! */
+	if ($payload["color"] === true) {
+		$fmt_url = "fmt_url";
+		$fmt_repo = "fmt_repo";
+		$fmt_name = "fmt_name";
+		$fmt_commit_name = "fmt_commit_name";
+		$fmt_tag = "fmt_tag";
+		$fmt_branch = "fmt_branch";
+		$fmt_hash = "fmt_hash";
+		$fmt_count = "fmt_count";
+	}
+	/* process */
+	$cmt_count = count($payload["commits"]);
+	$cmt_truncmsg = "";
+	if (isset($maxcommits) && $cmt_count > $maxcommits) {
+		if ($maxcommits < 0) {
+			/* unlimited */
+			break;
+		}
+		array_splice(
+			$payload["commits"],
+			0,
+			- $maxcommits
+		);
+		if ($maxcommits > 0) {
+			$cmt_truncmsg = sprintf(
+				" (truncated to %s)",
+				$fmt_count($maxcommits)
+			);
+		}
+	}
+	if ($payload["pusher"] !== false) {
+		$privmsg.= sprintf(
+			"%s pushed %s commit%s to branch %s %s.%s\n",
+			$fmt_name($payload["pusher"]),
+			$fmt_count($cmt_count),
+			($cmt_count === 1) ? "" : "s",
+			$fmt_branch($payload["branch"]),
+			strftime("on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]),
+			$cmt_truncmsg
+		);
+	}
+	foreach ($payload["commits"] as $commit) {
+		$privmsg.= sprintf(
+			"%s %s %s\n",
+			$fmt_hash(substr($commit["id"], 0, 8)),
+			$fmt_commit_name($commit["author"]),
+			brief_message($commit["message"], $payload["commitmsglen"])
+		);
+	}
+	if ($payload["filesummary"] === true) {
+		$privmsg.= sprintf(
+			"Files: +%d, ~%d, -%d\n",
+			$payload["acount"],
+			$payload["mcount"],
+			$payload["rcount"]
+		);
+	}
+	$privmsg.= sprintf(
+		"Diff at %s",
+		$fmt_url($payload["compare"])
+	);
+	$frepo = "[" . $fmt_repo($payload["repo"]) . "] ";
+	$privmsg = explode("\n", $privmsg);
+	foreach ($privmsg as $k => $v) {
+		$privmsg[$k] = $frepo . $v;
+	}
+	$recipients = getsend($payload);
+	foreach ($privmsg as $line) {
+		$jsonarr = array(
+			"to" => $recipients,
+			"privmsg" => $line,
+		);
+		$ret.= json_encode($jsonarr) . "\n";
+	}
+	return $ret;
+}
+
+switch($type) {
+	case GITHUB_T:
+		echo "Got a GitHub payload…\n";
+		$payload = process_gh($payload);
+		break;
+	case BITBUCKET_T:
+		echo "Got a BitBucket payload…\n";
+		$payload = process_bb($payload);
+		break;
+	default:
+		mekdie("No valid parse method specified!");
+}
+
+$payload["color"] = $color;
+$payload["filesummary"] = $files;
+$payload["commitmsglen"] = $commitmsglen;
+$payload["maxcommits"] = $maxcommits;
+$sockstr = process_irker($payload);
+
+echo $sockstr . "\n";
+
+$sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+if ($sock === false) {
+	mekdie(
+		"Failed to acquire socket!\n" .
+		socket_strerror(socket_last_error()) .
+		"\n"
+	);
+} else {
+	echo "Socket successfully created.\n";
+}
+
+echo "Attempting to connect to " . IRKER_HOST . " on port " . IRKER_PORT . "…\n";
+$result = socket_connect($sock, IRKER_HOST, IRKER_PORT);
+if ($result === false) {
+	mekdie(
+		"Connection failed!\n" .
+		socket_strerror(socket_last_error()) .
+		"\n"
+	);
+} else {
+	echo "Connected.\n";
+}
+
+echo "Sending request…\n";
+socket_write($sock, $sockstr, strlen($sockstr));
+echo "OK.\n";
+
+echo "Closing socket…\n";
+socket_close($sock);
+echo "Done.\n";
+
+mekdie(0);
+?>
