@@ -33,4 +33,3 @@ TODO
 
 * Pull requests (issue #1)
 * Branch/tag creation/deletion (issue #2)
-* Diff URL shortening (issue #3)

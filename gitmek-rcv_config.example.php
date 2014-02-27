@@ -2,6 +2,7 @@
 $logfile = "/var/tmp/gitmek-rcv.log";
 $maxcommits = 10;
 
+/* Send config */
 $sendto = array(
 	GITHUB_T => array(
 		/* SteamDB */
@@ -15,6 +16,27 @@ $sendto = array(
 		),
 	),
 	BITBUCKET_T => array(
+	),
+);
+
+/* Global display config */
+$config = array(
+	"color" => false,
+	"shorten" => false,
+	"filesummary" => false,
+	"commitmsglen" => 120,
+);
+
+/* Channel-specific configuration overrides */
+$targetconfig = array(
+	"irc://chat.freenode.net/#steamdb" => array(
+		"color" => true,
+		"shorten" => true,
+	),
+	"irc://chat.freenode.net/meklu,isnick" => array(
+		"color" => true,
+		"filesummary" => true,
+		"commitmsglen" => 50,
 	),
 );
 ?>

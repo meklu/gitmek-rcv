@@ -77,6 +77,18 @@ function getsend($payload) {
 	mekdie("No send target for payload.\n");
 }
 
+function getconfig($target) {
+	global $config, $targetconfig;
+	if (!isset($targetconfig)) {
+		return $config;
+	}
+	$tmp = array();
+	if (isset($targetconfig[$target])) {
+		$tmp = array_merge($config, $targetconfig[$target]);
+	}
+	return $tmp;
+}
+
 if (isset($_GET["type"])) {
 	if ($_GET["type"] === "gh") {
 		$type = GITHUB_T;
@@ -93,40 +105,57 @@ if (isset($_POST["payload"])) {
 	$payload = $_POST["payload"];
 }
 
-$color = false;
-
-if (isset($_GET["color"])) {
-	$color = true;
-}
+$defconfig = array(
+	"color" => false,
+	"shorten" => false,
+	"filesummary" => false,
+	"commitmsglen" => 120,
+);
 
 /* unlimited by default, set this in the config */
 if (!isset($maxcommits)) {
 	$maxcommits = -1;
 }
 
-$commitmsglen = 120;
+/* do some config merging */
+if (isset($config)) {
+	$config = array_merge($defconfig, $config);
+} else {
+	$config = $defconfig;
+}
+unset($defconfig);
+
+/* get the gets */
+$repoconfig = array();
+
+if (isset($_GET["color"])) {
+	$repoconfig["color"] = true;
+}
+
+if (isset($_GET["shorten"])) {
+	$repoconfig["shorten"] = true;
+}
 
 if (isset($_GET["commitmsglen"])) {
 	$tmp = intval($_GET["commitmsglen"]);
 	if ($tmp !== false) {
-		$commitmsglen = $tmp;
+		$repoconfig["commitmsglen"] = $tmp;
 	}
 	unset($tmp);
 }
 
-$files = false;
-
-if (isset($_GET["files"])) {
-	$files = true;
+if (isset($_GET["filesummary"])) {
+	$repoconfig["filesummary"] = true;
 }
 
+/* test the thing if we're going cli */
 if (php_sapi_name() === "cli") {
 	include("expayload.php");
 	$payload = $gh_ex_payload;
 	if (true) {
 		$type = BITBUCKET_T;
 		$payload = $bb_ex_payload;
-		$color = true;
+		$repoconfig["color"] = true;
 	}
 }
 
@@ -375,8 +404,38 @@ function brief_message($str, $maxlen = 120) {
 	return $str;
 }
 
-function process_irker($payload) {
-	$ret = "";
+function shorten_url($url) {
+	static $cache = array();
+	if (isset($cache[$url])) {
+		return $cache[$url];
+	}
+	$opts = array(
+		"http" => array(
+			"header" => "Content-type: application/x-www-form-urlencoded\r\n",
+			"method" => "POST",
+			"content" => http_build_query(array("url" => $url)),
+		),
+	);
+	$ctx = stream_context_create($opts);
+	$stream = @fopen("http://git.io", "r", false, $ctx);
+	if ($stream === false) {
+		/* damn it */
+		return $url;
+	}
+	$md = stream_get_meta_data($stream);
+	fclose($stream);
+	$headers = $md["wrapper_data"];
+	foreach($headers as $header) {
+		$key = "Location: ";
+		if (strpos($header, $key) === 0) {
+			return substr($header, strlen($key));
+		}
+	}
+	/* when all else fails, be stupid */
+	return $url;
+}
+
+function fmt_payload($payload, $config) {
 	$privmsg = "";
 	$maxcommits = $payload["maxcommits"];
 	if (count($payload["commits"]) === 0) {
@@ -392,7 +451,7 @@ function process_irker($payload) {
 	$fmt_hash = "fmt_hash_nocolor";
 	$fmt_count = "fmt_passthru";
 	/* color! */
-	if ($payload["color"] === true) {
+	if ($config["color"] === true) {
 		$fmt_url = "fmt_url";
 		$fmt_repo = "fmt_repo";
 		$fmt_name = "fmt_name";
@@ -424,24 +483,31 @@ function process_irker($payload) {
 	}
 	if ($payload["pusher"] !== false) {
 		$privmsg.= sprintf(
-			"%s pushed %s commit%s to branch %s %s.%s\n",
+			"%s pushed %s commit%s to branch %s %s.",
 			$fmt_name($payload["pusher"]),
 			$fmt_count($cmt_count),
 			($cmt_count === 1) ? "" : "s",
 			$fmt_branch($payload["branch"]),
-			strftime("on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]),
-			$cmt_truncmsg
+			strftime("on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"])
 		);
+		if ($config["shorten"]) {
+			$privmsg.= sprintf(
+				" %s",
+				$fmt_url(shortenurl($payload["compare"]))
+			);
+		}
+		$privmsg.= $cmt_truncmsg;
+		$privmsg.= "\n";
 	}
 	foreach ($payload["commits"] as $commit) {
 		$privmsg.= sprintf(
 			"%s %s %s\n",
 			$fmt_hash(substr($commit["id"], 0, 8)),
 			$fmt_commit_name($commit["author"]),
-			brief_message($commit["message"], $payload["commitmsglen"])
+			brief_message($commit["message"], $config["commitmsglen"])
 		);
 	}
-	if ($payload["filesummary"] === true) {
+	if ($config["filesummary"] === true) {
 		$privmsg.= sprintf(
 			"Files: +%d, ~%d, -%d\n",
 			$payload["acount"],
@@ -449,23 +515,49 @@ function process_irker($payload) {
 			$payload["rcount"]
 		);
 	}
-	$privmsg.= sprintf(
-		"Diff at %s",
-		$fmt_url($payload["compare"])
-	);
+	if ($config["shorten"] === false) {
+		$privmsg.= sprintf(
+			"Diff at %s",
+			$fmt_url($payload["compare"])
+		);
+	}
 	$frepo = "[" . $fmt_repo($payload["repo"]) . "] ";
 	$privmsg = explode("\n", $privmsg);
 	foreach ($privmsg as $k => $v) {
 		$privmsg[$k] = $frepo . $v;
 	}
-	$recipients = getsend($payload);
-	foreach ($privmsg as $line) {
+	return implode("\n", $privmsg);
+}
+
+function process_irker($payload) {
+	$ret = "";
+	$targets = getsend($payload);
+	$hashes = array();
+	/* hash the targets' configs */
+	foreach ($targets as $target) {
+		$rawconfig = getconfig($target);
+		$cfgjson = json_encode($rawconfig, true);
+		$hash = md5($cfgjson);
+		if (!isset($hashes[$hash])) {
+			$hashes[$hash] = array();
+			$hashes[$hash]["config"] = $rawconfig;
+			$hashes[$hash]["targets"] = array();
+		}
+		$hashes[$hash]["targets"][] = $target;
+		unset($cfgjson);
+		unset($hash);
+		unset($target);
+	}
+	unset($targets);
+	foreach ($hashes as $hash) {
 		$jsonarr = array(
-			"to" => $recipients,
-			"privmsg" => $line,
+			"to" => $hash["targets"],
+			"privmsg" => fmt_payload($payload, $hash["config"]),
 		);
 		$ret.= json_encode($jsonarr) . "\n";
+		unset($jsonarr);
 	}
+	unset($configs);
 	return $ret;
 }
 
@@ -482,9 +574,6 @@ switch($type) {
 		mekdie("No valid parse method specified!");
 }
 
-$payload["color"] = $color;
-$payload["filesummary"] = $files;
-$payload["commitmsglen"] = $commitmsglen;
 $payload["maxcommits"] = $maxcommits;
 $sockstr = process_irker($payload);
 
