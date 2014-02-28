@@ -11,6 +11,8 @@
  */
 date_default_timezone_set("UTC");
 header("Content-Type: text/plain; charset=utf-8");
+/* default to failure, set to 200 on success */
+http_response_code(500);
 
 /* types */
 define("INVALID_T",	-1);
@@ -29,9 +31,7 @@ function mekdie($str) {
 	$success = false;
 	if ($str === 0) {
 		$success = true;
-	}
-	if ($success === false) {
-		http_response_code(500);
+		http_response_code(200);
 	}
 	$ret = "===================================\n";
 	$ret.= "=== " . strftime("%Y-%m-%d %H:%M:%S (%z)") . " ===\n";
