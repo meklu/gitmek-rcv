@@ -493,7 +493,7 @@ function fmt_payload($payload, $config) {
 		if ($config["shorten"]) {
 			$privmsg.= sprintf(
 				" %s",
-				$fmt_url(shortenurl($payload["compare"]))
+				$fmt_url(shorten_url($payload["compare"]))
 			);
 		}
 		$privmsg.= $cmt_truncmsg;
