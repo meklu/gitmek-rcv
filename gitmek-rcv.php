@@ -520,13 +520,18 @@ function fmt_payload($payload, $config) {
 	}
 	if ($config["shorten"] === false) {
 		$privmsg.= sprintf(
-			"Diff at %s",
+			"Diff at %s\n",
 			$fmt_url($payload["compare"])
 		);
 	}
 	$frepo = "[" . $fmt_repo($payload["repo"]) . "] ";
 	$privmsg = explode("\n", $privmsg);
 	foreach ($privmsg as $k => $v) {
+		/* skip empty lines */
+		if ($v === "") {
+			unset($privmsg[$k]);
+			continue;
+		}
 		$privmsg[$k] = $frepo . $v;
 	}
 	return implode("\n", $privmsg);
