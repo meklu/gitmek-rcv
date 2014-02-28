@@ -30,6 +30,9 @@ function mekdie($str) {
 	if ($str === 0) {
 		$success = true;
 	}
+	if ($success === false) {
+		http_response_code(500);
+	}
 	$ret = "===================================\n";
 	$ret.= "=== " . strftime("%Y-%m-%d %H:%M:%S (%z)") . " ===\n";
 	if ($success === true) {
