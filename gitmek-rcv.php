@@ -171,10 +171,10 @@ function process_gh($payload) {
 	}
 	
 	/* do processing */
-	if ($payload["commits"]) {
+	if (isset($payload["commits"])) {
 		return process_gh_commit($payload);
 	}
-	else if ($payload["issue"]) {
+	else if (isset($payload["issue"])) {
 		return process_gh_issue($payload);
 	}
 }
