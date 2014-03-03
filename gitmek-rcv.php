@@ -59,11 +59,14 @@ function mekdie($str) {
 	if (isset($logfile) && strlen($logfile) > 0) {
 		error_log($ret, 3, $logfile);
 	}
+	if (is_string($str)) {
+		$str.= "\n";
+	}
 	die($str);
 }
 
 if (!isset($sendto) || empty($sendto)) {
-	mekdie("No send configuration!\n");
+	mekdie("No send configuration!");
 }
 
 /* default type */
@@ -71,7 +74,7 @@ $type = GITHUB_T;
 
 function getsend($payload) {
 	if (!isset($payload["type"])) {
-		mekdie("Empty payload?\n");
+		mekdie("Empty payload?");
 	}
 	global $sendto;
 	if (isset($sendto[$payload["type"]])) {
@@ -80,7 +83,7 @@ function getsend($payload) {
 			return $tmp[$payload["repo"]];
 		}
 	}
-	mekdie("No send target for payload.\n");
+	mekdie("No send target for payload.");
 }
 
 function getconfig($target) {
@@ -144,7 +147,7 @@ if (php_sapi_name() === "cli") {
 }
 
 if ($payload === false) {
-	mekdie("No payload!\n");
+	mekdie("No payload!");
 }
 
 $payload = json_decode($payload, true);
@@ -170,7 +173,7 @@ function process_gh($payload) {
 	if(php_sapi_name() !== "cli") {
 		# 192.30.252.0/22
 		if (chkip("192.30.252.0", 22, $_SERVER["REMOTE_ADDR"]) === false) {
-			mekdie("IP not in acceptable range!\n");
+			mekdie("IP not in acceptable range!");
 		}
 	}
 	/* do processing */
@@ -256,7 +259,7 @@ function process_bb($payload) {
 			}
 		}
 		if ($isgd === false) {
-			mekdie("IP not in acceptable range!\n");
+			mekdie("IP not in acceptable range!");
 		}
 	}
 	/* do processing */
@@ -464,7 +467,7 @@ function fmt_payload_commit($payload, $config) {
 	$privmsg = "";
 	$maxcommits = $payload["maxcommits"];
 	if (count($payload["commits"]) === 0) {
-		mekdie("Not enough commits to warrant action!\n");
+		mekdie("Not enough commits to warrant action!");
 	}
 	/* set up formatting functions */
 	$fmt_url = "fmt_passthru";
