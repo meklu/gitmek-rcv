@@ -587,7 +587,7 @@ function fmt_payload_issue($payload, $config, $fmt) {
 		"%s %s issue #%s",
 		$fmt["name"]($payload["creator"]),
 		$payload["action"],
-		$fmt["number"]($payload["number"])
+		$payload["number"]
 	);
 	if ($config["notime"] === false) {
 		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
