@@ -70,6 +70,9 @@ if (!isset($sendto) || empty($sendto)) {
 $type = GITHUB_T;
 
 function getsend($payload) {
+	if (!isset($payload["type"])) {
+		mekdie("Empty payload?\n");
+	}
 	global $sendto;
 	if (isset($sendto[$payload["type"]])) {
 		$tmp = $sendto[$payload["type"]];
@@ -208,6 +211,7 @@ function process_gh_commit($payload) {
 	}
 	return array(
 		"type"		=> GITHUB_T,
+		"event"		=> "commit",
 		"ts"		=> $payload["repository"]["pushed_at"],
 		"from"		=> $payload["before"],
 		"to"		=> $payload["after"],
@@ -224,7 +228,17 @@ function process_gh_commit($payload) {
 }
 
 function process_gh_issue($payload) {
-	// TODO
+	return array(
+		"type"		=> GITHUB_T,
+		"event"		=> "issue",
+		"ts"		=> strtotime($payload["issue"]["created_at"]),
+		"url"		=> $payload["issue"]["html_url"],
+		"creator"	=> $payload["issue"]["user"]["login"],
+		"repo"		=> $payload["repository"]["full_name"],
+		"issue"		=> $payload["issue"]["title"],
+		"number"	=> $payload["issue"]["number"],
+		"action"	=> $payload["action"],
+	);
 }
 
 function process_bb($payload) {
@@ -316,6 +330,7 @@ function process_bb($payload) {
 	 * is equivalent to git's HEAD~3..HEAD */
 	return array(
 		"type"		=> BITBUCKET_T,
+		"event"		=> "commit",
 		/* assume 'right now', since bb doesn't provide this info */
 		"ts"		=> time(),
 		"from"		=> $from,
@@ -435,6 +450,17 @@ function strip_org($repo) {
 }
 
 function fmt_payload($payload, $config) {
+	switch ($payload["event"]) {
+		case "commit":
+			return fmt_payload_commit($payload, $config);
+		case "issue":
+			return fmt_payload_issue($payload, $config);
+		default:
+			mekdie("No valid format payload method specified!");
+	}
+}
+
+function fmt_payload_commit($payload, $config) {
 	$privmsg = "";
 	$maxcommits = $payload["maxcommits"];
 	if (count($payload["commits"]) === 0) {
@@ -539,6 +565,39 @@ function fmt_payload($payload, $config) {
 		$privmsg[$k] = $frepo . $v;
 	}
 	return implode("\n", $privmsg);
+}
+
+function fmt_payload_issue($payload, $config) {
+	$privmsg = "";
+	/* set up formatting functions */
+	$fmt_url = "fmt_passthru";
+	$fmt_repo = "fmt_passthru";
+	$fmt_name = "fmt_passthru";
+	$fmt_number = "fmt_passthru";
+	/* color! */
+	if ($config["color"] === true) {
+		$fmt_url = "fmt_url";
+		$fmt_repo = "fmt_repo";
+		$fmt_name = "fmt_name";
+		$fmt_number = "fmt_count";
+	}
+	/* process */
+	$privmsg.= sprintf(
+		"[%s] %s %s issue #%s",
+		$fmt_repo($payload["repo"]),
+		$fmt_name($payload["creator"]),
+		$payload["action"],
+		$fmt_number($cmt_count)
+	);
+	if (!$config["notime"]) {
+		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
+	}
+	$privmsg.= sprintf(
+		": %s. See at %s",
+		brief_message($payload["issue"], $config["commitmsglen"]),
+		$fmt_url($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
+	);
+	return $privmsg;
 }
 
 function process_irker($payload) {
