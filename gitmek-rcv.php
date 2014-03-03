@@ -112,6 +112,7 @@ $defconfig = array(
 	"color" => false,
 	"shorten" => false,
 	"notime" => false,
+	"striporg" => false,
 	"filesummary" => false,
 	"commitmsglen" => 120,
 );
@@ -428,6 +429,11 @@ function shorten_url($url) {
 	return $url;
 }
 
+function strip_org($repo) {
+	$pos = strpos($repo, '/');
+	return substr($repo, $pos + 1);
+}
+
 function fmt_payload($payload, $config) {
 	$privmsg = "";
 	$maxcommits = $payload["maxcommits"];
@@ -518,7 +524,11 @@ function fmt_payload($payload, $config) {
 			$fmt_url($payload["compare"])
 		);
 	}
-	$frepo = "[" . $fmt_repo($payload["repo"]) . "] ";
+	$repo = $fmt_repo($payload["repo"]);
+	if ($config["striporg"] === true) {
+		$repo = strip_org($repo);
+	}
+	$frepo = "[" . $repo . "] ";
 	$privmsg = explode("\n", $privmsg);
 	foreach ($privmsg as $k => $v) {
 		/* skip empty lines */

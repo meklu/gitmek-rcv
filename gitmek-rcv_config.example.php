@@ -23,6 +23,8 @@ $sendto = array(
 $config = array(
 	"color" => false,
 	"shorten" => false,
+	"notime" => false,
+	"striporg" => false,
 	"filesummary" => false,
 	"commitmsglen" => 120,
 );
@@ -32,6 +34,8 @@ $targetconfig = array(
 	"irc://chat.freenode.net/#steamdb" => array(
 		"color" => true,
 		"shorten" => true,
+		"notime" => true,
+		"striporg" => true,
 	),
 	"irc://chat.freenode.net/meklu,isnick" => array(
 		"color" => true,
