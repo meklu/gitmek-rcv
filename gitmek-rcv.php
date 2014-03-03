@@ -236,7 +236,7 @@ function process_gh_issue($payload) {
 		"event"		=> "issue",
 		"ts"		=> strtotime($payload["issue"]["created_at"]),
 		"url"		=> $payload["issue"]["html_url"],
-		"creator"	=> $payload["issue"]["user"]["login"],
+		"actor"		=> $payload["sender"]["login"],
 		"repo"		=> $payload["repository"]["full_name"],
 		"issue"		=> $payload["issue"]["title"],
 		"number"	=> $payload["issue"]["number"],
@@ -585,7 +585,7 @@ function fmt_payload_issue($payload, $config, $fmt) {
 	/* process */
 	$privmsg.= sprintf(
 		"%s %s issue #%s",
-		$fmt["name"]($payload["creator"]),
+		$fmt["name"]($payload["actor"]),
 		$payload["action"],
 		$payload["number"]
 	);
@@ -593,7 +593,7 @@ function fmt_payload_issue($payload, $config, $fmt) {
 		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
 	}
 	$privmsg.= sprintf(
-		": %s. See at %s",
+		": %s. See %s",
 		brief_message($payload["issue"], $config["commitmsglen"]),
 		$fmt["url"]($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
 	);
