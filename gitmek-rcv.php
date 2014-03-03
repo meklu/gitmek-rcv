@@ -454,22 +454,38 @@ function strip_org($repo) {
 
 function fmt_payload($payload, $config) {
 	$ret = "";
+	/* set up formatting functions */
+	$fmt["url"] = "fmt_passthru";
+	$fmt["repo"] = "fmt_passthru";
+	$fmt["name"] = "fmt_passthru";
+	$fmt["commit_name"] = "fmt_commit_name_nocolor";
+	$fmt["tag"] = "fmt_passthru";
+	$fmt["branch"] = "fmt_passthru";
+	$fmt["hash"] = "fmt_hash_nocolor";
+	$fmt["count"] = "fmt_passthru";
+	/* color! */
+	if ($config["color"] === true) {
+		$fmt["url"] = "fmt_url";
+		$fmt["repo"] = "fmt_repo";
+		$fmt["name"] = "fmt_name";
+		$fmt["commit_name"] = "fmt_commit_name";
+		$fmt["tag"] = "fmt_tag";
+		$fmt["branch"] = "fmt_branch";
+		$fmt["hash"] = "fmt_hash";
+		$fmt["count"] = "fmt_count";
+	}
 	switch ($payload["event"]) {
 		case "commit":
-			$ret = fmt_payload_commit($payload, $config);
+			$ret = fmt_payload_commit($payload, $config, $fmt);
 			break;
 		case "issue":
-			$ret = fmt_payload_issue($payload, $config);
+			$ret = fmt_payload_issue($payload, $config, $fmt);
 			break;
 		default:
 			mekdie("No valid payload format specified!");
 	}
-	$fmt_repo = "fmt_passthru";
-	if ($config["color"] === true) {
-		$fmt_repo = "fmt_repo";
-	}
 	/* post-process the lines */
-	$repo = $fmt_repo($payload["repo"]);
+	$repo = $fmt["repo"]($payload["repo"]);
 	if ($config["striporg"] === true) {
 		$repo = strip_org($repo);
 	}
@@ -491,31 +507,11 @@ function fmt_payload($payload, $config) {
 	return $ret;
 }
 
-function fmt_payload_commit($payload, $config) {
+function fmt_payload_commit($payload, $config, $fmt) {
 	$privmsg = "";
 	$maxcommits = $payload["maxcommits"];
 	if (count($payload["commits"]) === 0) {
 		mekdie("Not enough commits to warrant action!");
-	}
-	/* set up formatting functions */
-	$fmt_url = "fmt_passthru";
-	$fmt_repo = "fmt_passthru";
-	$fmt_name = "fmt_passthru";
-	$fmt_commit_name = "fmt_commit_name_nocolor";
-	$fmt_tag = "fmt_passthru";
-	$fmt_branch = "fmt_passthru";
-	$fmt_hash = "fmt_hash_nocolor";
-	$fmt_count = "fmt_passthru";
-	/* color! */
-	if ($config["color"] === true) {
-		$fmt_url = "fmt_url";
-		$fmt_repo = "fmt_repo";
-		$fmt_name = "fmt_name";
-		$fmt_commit_name = "fmt_commit_name";
-		$fmt_tag = "fmt_tag";
-		$fmt_branch = "fmt_branch";
-		$fmt_hash = "fmt_hash";
-		$fmt_count = "fmt_count";
 	}
 	/* process */
 	$cmt_count = count($payload["commits"]);
@@ -533,17 +529,17 @@ function fmt_payload_commit($payload, $config) {
 		if ($maxcommits > 0) {
 			$cmt_truncmsg = sprintf(
 				" (truncated to %s)",
-				$fmt_count($maxcommits)
+				$fmt["count"]($maxcommits)
 			);
 		}
 	}
 	if ($payload["pusher"] !== false) {
 		$privmsg.= sprintf(
 			"%s pushed %s commit%s to %s",
-			$fmt_name($payload["pusher"]),
-			$fmt_count($cmt_count),
+			$fmt["name"]($payload["pusher"]),
+			$fmt["count"]($cmt_count),
 			($cmt_count === 1) ? "" : "s",
-			$fmt_branch($payload["branch"])
+			$fmt["branch"]($payload["branch"])
 		);
 		if (!$config["notime"]) {
 			$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
@@ -551,7 +547,7 @@ function fmt_payload_commit($payload, $config) {
 		if ($config["shorten"]) {
 			$privmsg.= sprintf(
 				": %s",
-				$fmt_url(shorten_url($payload["compare"]))
+				$fmt["url"](shorten_url($payload["compare"]))
 			);
 		} else {
 			$privmsg.= ".";
@@ -562,8 +558,8 @@ function fmt_payload_commit($payload, $config) {
 	foreach ($payload["commits"] as $commit) {
 		$privmsg.= sprintf(
 			"%s %s %s\n",
-			$fmt_hash(substr($commit["id"], 0, 8)),
-			$fmt_commit_name($commit["author"]),
+			$fmt["hash"](substr($commit["id"], 0, 8)),
+			$fmt["commit_name"]($commit["author"]),
 			brief_message($commit["message"], $config["commitmsglen"])
 		);
 	}
@@ -578,32 +574,20 @@ function fmt_payload_commit($payload, $config) {
 	if ($config["shorten"] === false) {
 		$privmsg.= sprintf(
 			"Diff at %s\n",
-			$fmt_url($payload["compare"])
+			$fmt["url"]($payload["compare"])
 		);
 	}
 	return $privmsg;
 }
 
-function fmt_payload_issue($payload, $config) {
+function fmt_payload_issue($payload, $config, $fmt) {
 	$privmsg = "";
-	/* set up formatting functions */
-	$fmt_url = "fmt_passthru";
-	$fmt_repo = "fmt_passthru";
-	$fmt_name = "fmt_passthru";
-	$fmt_number = "fmt_passthru";
-	/* color! */
-	if ($config["color"] === true) {
-		$fmt_url = "fmt_url";
-		$fmt_repo = "fmt_repo";
-		$fmt_name = "fmt_name";
-		$fmt_number = "fmt_count";
-	}
 	/* process */
 	$privmsg.= sprintf(
 		"%s %s issue #%s",
-		$fmt_name($payload["creator"]),
+		$fmt["name"]($payload["creator"]),
 		$payload["action"],
-		$fmt_number($payload["number"])
+		$fmt["number"]($payload["number"])
 	);
 	if ($config["notime"] === false) {
 		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
@@ -611,7 +595,7 @@ function fmt_payload_issue($payload, $config) {
 	$privmsg.= sprintf(
 		": %s. See at %s",
 		brief_message($payload["issue"], $config["commitmsglen"]),
-		$fmt_url($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
+		$fmt["url"]($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
 	);
 	return $privmsg;
 }
