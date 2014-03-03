@@ -169,7 +169,17 @@ function process_gh($payload) {
 			mekdie("IP not in acceptable range!\n");
 		}
 	}
+	
 	/* do processing */
+	if ($payload["commits"]) {
+		return process_gh_commit($payload);
+	}
+	else if ($payload["issue"]) {
+		return process_gh_issue($payload);
+	}
+}
+
+function process_gh_commit($payload) {
 	$commits = $payload["commits"];
 	$retcommits = array();
 	$atotal = 0;
@@ -211,6 +221,10 @@ function process_gh($payload) {
 		"mcount"	=> $mtotal,
 		"rcount"	=> $rtotal,
 	);
+}
+
+function process_gh_issue($payload) {
+	// TODO
 }
 
 function process_bb($payload) {
