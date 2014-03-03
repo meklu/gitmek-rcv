@@ -169,7 +169,6 @@ function process_gh($payload) {
 			mekdie("IP not in acceptable range!\n");
 		}
 	}
-	
 	/* do processing */
 	if (isset($payload["commits"])) {
 		return process_gh_commit($payload);
