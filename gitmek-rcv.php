@@ -453,14 +453,42 @@ function strip_org($repo) {
 }
 
 function fmt_payload($payload, $config) {
+	$ret = "";
 	switch ($payload["event"]) {
 		case "commit":
-			return fmt_payload_commit($payload, $config);
+			$ret = fmt_payload_commit($payload, $config);
+			break;
 		case "issue":
-			return fmt_payload_issue($payload, $config);
+			$ret = fmt_payload_issue($payload, $config);
+			break;
 		default:
-			mekdie("No valid format payload method specified!");
+			mekdie("No valid payload format specified!");
 	}
+	$fmt_repo = "fmt_passthru";
+	if ($config["color"] === true) {
+		$fmt_repo = "fmt_repo";
+	}
+	/* post-process the lines */
+	$repo = $fmt_repo($payload["repo"]);
+	if ($config["striporg"] === true) {
+		$repo = strip_org($repo);
+	}
+	$frepo = "[" . $repo . "] ";
+	$ret = explode("\n", $ret);
+	foreach ($ret as $k => $v) {
+		/* skip empty lines */
+		if ($v === "") {
+			unset($ret[$k]);
+			continue;
+		}
+		$ret[$k] = $frepo . $v;
+	}
+	$ret = implode("\n", $ret);
+	unset($k);
+	unset($v);
+	unset($repo);
+	unset($frepo);
+	return $ret;
 }
 
 function fmt_payload_commit($payload, $config) {
@@ -553,21 +581,7 @@ function fmt_payload_commit($payload, $config) {
 			$fmt_url($payload["compare"])
 		);
 	}
-	$repo = $fmt_repo($payload["repo"]);
-	if ($config["striporg"] === true) {
-		$repo = strip_org($repo);
-	}
-	$frepo = "[" . $repo . "] ";
-	$privmsg = explode("\n", $privmsg);
-	foreach ($privmsg as $k => $v) {
-		/* skip empty lines */
-		if ($v === "") {
-			unset($privmsg[$k]);
-			continue;
-		}
-		$privmsg[$k] = $frepo . $v;
-	}
-	return implode("\n", $privmsg);
+	return $privmsg;
 }
 
 function fmt_payload_issue($payload, $config) {
@@ -586,13 +600,12 @@ function fmt_payload_issue($payload, $config) {
 	}
 	/* process */
 	$privmsg.= sprintf(
-		"[%s] %s %s issue #%s",
-		$fmt_repo($payload["repo"]),
+		"%s %s issue #%s",
 		$fmt_name($payload["creator"]),
 		$payload["action"],
-		$fmt_number($cmt_count)
+		$fmt_number($payload["number"])
 	);
-	if (!$config["notime"]) {
+	if ($config["notime"] === false) {
 		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
 	}
 	$privmsg.= sprintf(
