@@ -111,6 +111,7 @@ if (isset($_POST["payload"])) {
 $defconfig = array(
 	"color" => false,
 	"shorten" => false,
+	"notime" => false,
 	"filesummary" => false,
 	"commitmsglen" => 120,
 );
@@ -462,18 +463,22 @@ function fmt_payload($payload, $config) {
 	}
 	if ($payload["pusher"] !== false) {
 		$privmsg.= sprintf(
-			"%s pushed %s commit%s to branch %s %s.",
+			"%s pushed %s commit%s to %s",
 			$fmt_name($payload["pusher"]),
 			$fmt_count($cmt_count),
 			($cmt_count === 1) ? "" : "s",
-			$fmt_branch($payload["branch"]),
-			strftime("on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"])
+			$fmt_branch($payload["branch"])
 		);
+		if (!$config["notime"]) {
+			$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
+		}
 		if ($config["shorten"]) {
 			$privmsg.= sprintf(
-				" %s",
+				": %s",
 				$fmt_url(shorten_url($payload["compare"]))
 			);
+		} else {
+			$privmsg.= ".";
 		}
 		$privmsg.= $cmt_truncmsg;
 		$privmsg.= "\n";
