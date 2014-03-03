@@ -128,29 +128,6 @@ if (isset($config)) {
 }
 unset($defconfig);
 
-/* get the gets */
-$repoconfig = array();
-
-if (isset($_GET["color"])) {
-	$repoconfig["color"] = true;
-}
-
-if (isset($_GET["shorten"])) {
-	$repoconfig["shorten"] = true;
-}
-
-if (isset($_GET["commitmsglen"])) {
-	$tmp = intval($_GET["commitmsglen"]);
-	if ($tmp !== false) {
-		$repoconfig["commitmsglen"] = $tmp;
-	}
-	unset($tmp);
-}
-
-if (isset($_GET["filesummary"])) {
-	$repoconfig["filesummary"] = true;
-}
-
 /* test the thing if we're going cli */
 if (php_sapi_name() === "cli") {
 	include("expayload.php");
@@ -158,7 +135,6 @@ if (php_sapi_name() === "cli") {
 	if (true) {
 		$type = BITBUCKET_T;
 		$payload = $bb_ex_payload;
-		$repoconfig["color"] = true;
 	}
 }
 
@@ -619,4 +595,3 @@ socket_close($sock);
 echo "Done.\n";
 
 mekdie(0);
-?>
