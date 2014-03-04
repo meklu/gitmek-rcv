@@ -394,6 +394,9 @@ function fmt_hash_nocolor($str) {
 function fmt_count($count) {
 	return "\00309$count\017";
 }
+function fmt_issue($count) {
+	return "\00307$count\017";
+}
 /* this is silly */
 function fmt_passthru($str) {
 	return $str;
@@ -463,6 +466,7 @@ function fmt_payload($payload, $config) {
 	$fmt["branch"] = "fmt_passthru";
 	$fmt["hash"] = "fmt_hash_nocolor";
 	$fmt["count"] = "fmt_passthru";
+	$fmt["issue"] = "fmt_passthru";
 	/* color! */
 	if ($config["color"] === true) {
 		$fmt["url"] = "fmt_url";
@@ -473,6 +477,7 @@ function fmt_payload($payload, $config) {
 		$fmt["branch"] = "fmt_branch";
 		$fmt["hash"] = "fmt_hash";
 		$fmt["count"] = "fmt_count";
+		$fmt["issue"] = "fmt_issue";
 	}
 	switch ($payload["event"]) {
 		case "commit":
@@ -584,10 +589,10 @@ function fmt_payload_issue($payload, $config, $fmt) {
 	$privmsg = "";
 	/* process */
 	$privmsg.= sprintf(
-		"%s %s issue #%s",
+		"%s %s issue %s",
 		$fmt["name"]($payload["actor"]),
 		$payload["action"],
-		$payload["number"]
+		$fmt["issue"]("#" . $payload["number"])
 	);
 	if ($config["notime"] === false) {
 		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
