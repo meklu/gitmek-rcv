@@ -394,8 +394,25 @@ function fmt_hash_nocolor($str) {
 function fmt_count($count) {
 	return "\00309$count\017";
 }
-function fmt_issue($count) {
-	return "\00307$count\017";
+function fmt_issue($str) {
+	return "\00307$str\017";
+}
+function fmt_action($str) {
+	$color = NULL;
+	switch ($str) {
+	case "deleted":
+	case "closed":
+		$color = "05";
+		break;
+	case "created":
+	case "opened":
+		$color = "09";
+		break;
+	}
+	if ($color != NULL) {
+		return "\003$color$str\017";
+	}
+	return $str;
 }
 /* this is silly */
 function fmt_passthru($str) {
@@ -467,6 +484,7 @@ function fmt_payload($payload, $config) {
 	$fmt["hash"] = "fmt_hash_nocolor";
 	$fmt["count"] = "fmt_passthru";
 	$fmt["issue"] = "fmt_passthru";
+	$fmt["action"] = "fmt_passthru";
 	/* color! */
 	if ($config["color"] === true) {
 		$fmt["url"] = "fmt_url";
@@ -478,6 +496,7 @@ function fmt_payload($payload, $config) {
 		$fmt["hash"] = "fmt_hash";
 		$fmt["count"] = "fmt_count";
 		$fmt["issue"] = "fmt_issue";
+		$fmt["action"] = "fmt_action";
 	}
 	switch ($payload["event"]) {
 		case "commit":
@@ -591,7 +610,7 @@ function fmt_payload_issue($payload, $config, $fmt) {
 	$privmsg.= sprintf(
 		"%s %s issue %s",
 		$fmt["name"]($payload["actor"]),
-		$payload["action"],
+		$fmt["action"]($payload["action"]),
 		$fmt["issue"]("#" . $payload["number"])
 	);
 	if ($config["notime"] === false) {
