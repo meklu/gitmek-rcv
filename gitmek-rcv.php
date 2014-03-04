@@ -306,15 +306,15 @@ function process_bb($payload) {
 		$tmp["rcount"] = 0;
 		foreach ($commit["files"] as $file) {
 			switch ($file["type"]) {
-				case "added":
-					$tmp["acount"] += 1;
-					break;
-				case "modified":
-					$tmp["mcount"] += 1;
-					break;
-				case "removed":
-					$tmp["rcount"] += 1;
-					break;
+			case "added":
+				$tmp["acount"] += 1;
+				break;
+			case "modified":
+				$tmp["mcount"] += 1;
+				break;
+			case "removed":
+				$tmp["rcount"] += 1;
+				break;
 			}
 		}
 		$atotal += $tmp["acount"];
@@ -398,7 +398,6 @@ function fmt_issue($str) {
 	return "\00307$str\017";
 }
 function fmt_action($str) {
-	$color = NULL;
 	switch ($str) {
 	case "deleted":
 	case "closed":
@@ -407,6 +406,9 @@ function fmt_action($str) {
 	case "created":
 	case "opened":
 		$color = "09";
+		break;
+	default:
+		$color = NULL;
 		break;
 	}
 	if ($color != NULL) {
@@ -657,16 +659,16 @@ function process_irker($payload) {
 }
 
 switch($type) {
-	case GITHUB_T:
-		echo "Got a GitHub payload…\n";
-		$payload = process_gh($payload);
-		break;
-	case BITBUCKET_T:
-		echo "Got a BitBucket payload…\n";
-		$payload = process_bb($payload);
-		break;
-	default:
-		mekdie("No valid parse method specified!");
+case GITHUB_T:
+	echo "Got a GitHub payload…\n";
+	$payload = process_gh($payload);
+	break;
+case BITBUCKET_T:
+	echo "Got a BitBucket payload…\n";
+	$payload = process_bb($payload);
+	break;
+default:
+	mekdie("No valid parse method specified!");
 }
 
 $payload["maxcommits"] = $maxcommits;
