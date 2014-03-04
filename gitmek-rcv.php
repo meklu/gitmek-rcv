@@ -407,6 +407,10 @@ function fmt_action($str) {
 	case "opened":
 		$color = "09";
 		break;
+	case "modified":
+	case "re-opened":
+		$color = "07";
+		break;
 	default:
 		$color = NULL;
 		break;
