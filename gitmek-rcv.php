@@ -466,7 +466,9 @@ function shorten_url($url) {
 	foreach($headers as $header) {
 		$key = "Location: ";
 		if (strpos($header, $key) === 0) {
-			return substr($header, strlen($key));
+			$ret = substr($header, strlen($key));
+			$cache[$url] = $ret;
+			return $ret;
 		}
 	}
 	/* when all else fails, be stupid */
