@@ -247,9 +247,10 @@ function process_gh_issue($payload) {
 function process_bb($payload) {
 	/* check ip */
 	if(php_sapi_name() !== "cli") {
+		/* https://confluence.atlassian.com/display/BITBUCKET/POST+hook+management */
 		$ips = array(
-			"207.223.240.187",
-			"207.223.240.188",
+			"131.103.20.165",
+			"131.103.20.166",
 		);
 		$isgd = false;
 		foreach ($ips as $gdip) {
