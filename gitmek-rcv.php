@@ -397,10 +397,14 @@ function fmt_count($count) {
 function fmt_issue($str) {
 	return "\00307$str\017";
 }
-function fmt_action($str) {
-	switch ($str) {
+function fmt_action($type, $str = false) {
+	if ($str === false) {
+		$str = $type;
+	}
+	switch ($type) {
 	case "deleted":
 	case "closed":
+	case "force-pushed":
 		$color = "05";
 		break;
 	case "created":
@@ -408,7 +412,7 @@ function fmt_action($str) {
 		$color = "09";
 		break;
 	case "modified":
-	case "re-opened":
+	case "reopened":
 		$color = "07";
 		break;
 	default:
@@ -417,6 +421,12 @@ function fmt_action($str) {
 	}
 	if ($color != NULL) {
 		return "\003$color$str\017";
+	}
+	return $str;
+}
+function fmt_action_nocolor($str, $override = false) {
+	if ($override !== false) {
+		return $override;
 	}
 	return $str;
 }
@@ -492,7 +502,7 @@ function fmt_payload($payload, $config) {
 	$fmt["hash"] = "fmt_hash_nocolor";
 	$fmt["count"] = "fmt_passthru";
 	$fmt["issue"] = "fmt_passthru";
-	$fmt["action"] = "fmt_passthru";
+	$fmt["action"] = "fmt_action_nocolor";
 	/* color! */
 	if ($config["color"] === true) {
 		$fmt["url"] = "fmt_url";
@@ -597,10 +607,10 @@ function fmt_payload_commit($payload, $config, $fmt) {
 	}
 	if ($config["filesummary"] === true) {
 		$privmsg.= sprintf(
-			"Files: +%d, ~%d, -%d\n",
-			$payload["acount"],
-			$payload["mcount"],
-			$payload["rcount"]
+			"Files: %s, %s, %s\n",
+			$fmt["action"]("created", "+" . $payload["acount"]),
+			$fmt["action"]("modified", "~" . $payload["mcount"]),
+			$fmt["action"]("deleted", "-" . $payload["rcount"])
 		);
 	}
 	if ($config["shorten"] === false) {
