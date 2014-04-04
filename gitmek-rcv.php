@@ -170,18 +170,25 @@ function chkip($base, $mask, $chk) {
 
 function process_gh($payload) {
 	/* check ip */
-	if(php_sapi_name() !== "cli") {
+	if (php_sapi_name() !== "cli") {
 		# 192.30.252.0/22
 		if (chkip("192.30.252.0", 22, $_SERVER["REMOTE_ADDR"]) === false) {
 			mekdie("IP not in acceptable range!");
 		}
 	}
-	/* do processing */
-	if (isset($payload["commits"])) {
-		return process_gh_commit($payload);
+	$event = "push";
+	if (isset($_SERVER["HTTP_X_GITHUB_EVENT"])) {
+		$event = $_SERVER["HTTP_X_GITHUB_EVENT"];
 	}
-	else if (isset($payload["issue"])) {
+	/* do processing */
+	if ($event === "push") {
+		return process_gh_commit($payload);
+	} else if ($event === "issues") {
 		return process_gh_issue($payload);
+	} else if ($event === "issue_comment") {
+		return process_gh_issuecomment($payload);
+	} else if ($event === "pull_request") {
+		return process_gh_pullrequest($payload);
 	}
 }
 
@@ -240,6 +247,34 @@ function process_gh_issue($payload) {
 		"repo"		=> $payload["repository"]["full_name"],
 		"issue"		=> $payload["issue"]["title"],
 		"number"	=> $payload["issue"]["number"],
+		"action"	=> $payload["action"],
+	);
+}
+
+function process_gh_issuecomment($payload) {
+	return array(
+		"type"		=> GITHUB_T,
+		"event"		=> "issuecomment",
+		"ts"		=> strtotime($payload["comment"]["created_at"]),
+		"url"		=> $payload["comment"]["html_url"],
+		"actor"		=> $payload["sender"]["login"],
+		"repo"		=> $payload["repository"]["full_name"],
+		"issue"		=> $payload["issue"]["title"],
+		"number"	=> $payload["issue"]["number"],
+		"action"	=> $payload["action"],
+	);
+}
+
+function process_gh_pullrequest($payload) {
+	return array(
+		"type"		=> GITHUB_T,
+		"event"		=> "pullrequest",
+		"ts"		=> strtotime($payload["pull_request"]["created_at"]),
+		"url"		=> $payload["issue"]["html_url"],
+		"actor"		=> $payload["sender"]["login"],
+		"repo"		=> $payload["repository"]["full_name"],
+		"title"		=> $payload["pull_request"]["title"],
+		"number"	=> $payload["pull_request"]["number"],
 		"action"	=> $payload["action"],
 	);
 }
@@ -475,7 +510,7 @@ function shorten_url($url) {
 	fclose($stream);
 	$headers = $md["wrapper_data"];
 	foreach($headers as $header) {
-		$key = "Location: ";
+		static $key = "Location: ";
 		if (strpos($header, $key) === 0) {
 			$ret = substr($header, strlen($key));
 			$cache[$url] = $ret;
@@ -494,6 +529,7 @@ function strip_org($repo) {
 function fmt_payload($payload, $config) {
 	$ret = "";
 	/* set up formatting functions */
+	$fmt = array();
 	$fmt["url"] = "fmt_passthru";
 	$fmt["repo"] = "fmt_passthru";
 	$fmt["name"] = "fmt_passthru";
@@ -517,15 +553,11 @@ function fmt_payload($payload, $config) {
 		$fmt["issue"] = "fmt_issue";
 		$fmt["action"] = "fmt_action";
 	}
-	switch ($payload["event"]) {
-		case "commit":
-			$ret = fmt_payload_commit($payload, $config, $fmt);
-			break;
-		case "issue":
-			$ret = fmt_payload_issue($payload, $config, $fmt);
-			break;
-		default:
-			mekdie("No valid payload format specified!");
+	$func = "fmt_payload_" . $payload["event"];
+	if (function_exists($func)) {
+		$ret = $func($payload, $config, $fmt);
+	} else {
+		mekdie("No valid payload format specified!");
 	}
 	/* post-process the lines */
 	$repo = $fmt["repo"]($payload["repo"]);
@@ -628,6 +660,45 @@ function fmt_payload_issue($payload, $config, $fmt) {
 	/* process */
 	$privmsg.= sprintf(
 		"%s %s issue %s",
+		$fmt["name"]($payload["actor"]),
+		$fmt["action"]($payload["action"]),
+		$fmt["issue"]("#" . $payload["number"])
+	);
+	if ($config["notime"] === false) {
+		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
+	}
+	$privmsg.= sprintf(
+		": %s. See %s",
+		brief_message($payload["issue"], $config["commitmsglen"]),
+		$fmt["url"]($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
+	);
+	return $privmsg;
+}
+
+function fmt_payload_issuecomment($payload, $config, $fmt) {
+	$privmsg = "";
+	/* process */
+	$privmsg.= sprintf(
+		"%s commented on issue %s",
+		$fmt["name"]($payload["actor"]),
+		$fmt["issue"]("#" . $payload["number"])
+	);
+	if ($config["notime"] === false) {
+		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
+	}
+	$privmsg.= sprintf(
+		": %s. See %s",
+		brief_message($payload["issue"], $config["commitmsglen"]),
+		$fmt["url"]($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
+	);
+	return $privmsg;
+}
+
+function fmt_payload_pullrequest($payload, $config, $fmt) {
+	$privmsg = "";
+	/* process */
+	$privmsg.= sprintf(
+		"%s %s pull request %s",
 		$fmt["name"]($payload["actor"]),
 		$fmt["action"]($payload["action"]),
 		$fmt["issue"]("#" . $payload["number"])
