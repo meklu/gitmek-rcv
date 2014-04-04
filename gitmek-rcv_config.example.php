@@ -8,6 +8,8 @@ $sendto = array(
 		/* SteamDB */
 		"SteamDatabase/SteamLinux" => array(
 			"irc://chat.freenode.net/#steamlug",
+		),
+		"SteamDatabase/*" => array(
 			"irc://chat.freenode.net/#steamdb",
 		),
 		/* Personal */

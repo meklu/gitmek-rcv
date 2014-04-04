@@ -78,9 +78,26 @@ function getsend($payload) {
 	}
 	global $sendto;
 	if (isset($sendto[$payload["type"]])) {
+		$ret = array();
 		$tmp = $sendto[$payload["type"]];
 		if (isset($tmp[$payload["repo"]])) {
-			return $tmp[$payload["repo"]];
+			/* Send targets can be strings too but we can
+			 * cast those to a one-element array
+			 */
+			$ret = array_merge($ret, (array) $tmp[$payload["repo"]]);
+		}
+		/* wildcards */
+		foreach ($tmp as $k => $v) {
+			if (wild($payload["repo"], $k) === true) {
+				$ret = array_merge($ret, (array) $v);
+			}
+		}
+		if (count($ret) > 0) {
+			/* try to look clean */
+			if (count($ret) === 1) {
+				return $ret[0];
+			}
+			return $ret;
 		}
 	}
 	mekdie("No send target for payload.");
@@ -151,6 +168,64 @@ if ($payload === false) {
 }
 
 $payload = json_decode($payload, true);
+
+/* Sooper dooper fast wildcard function, `wild_strpos3' from
+ * https://gist.github.com/meklu/d573a4ebf1c92a504825
+ *
+ * Cache misses cost a bit :(
+ */
+function wild($str, $expr) {
+	if(strpos($expr, '*') === false) {
+		return strcmp($expr, $str) === 0;
+	}
+	static $cache = array();
+	if (isset($cache[$expr])) {
+		if (isset($cache[$expr][$str])) {
+			return $cache[$expr][$str];
+		}
+	} else {
+		$cache[$expr] = array();
+	}
+	$ret = true;
+	$delim = false;
+	$aspos = false;
+	/* string offsets */
+	$eoff = 0;
+	$soff = 0;
+	do {
+		/* asterisk position */
+		$aspos = strpos($expr, '*', $eoff);
+		if ($aspos === false) {
+			$enew = strlen($expr);
+			$snew = strlen($str);
+		} else {
+			$enew = $aspos;
+			$delim = substr($expr, $aspos + 1, 1);
+			if ($delim === false) {
+				$snew = strlen($str);
+			} else {
+				$snew = strpos($str, $delim, $soff);
+				if ($snew === false) {
+					$snew = strlen($str);
+				}
+			}
+		}
+		/* compare strings between offset and asterisk */
+		$cmplen = $enew - $eoff;
+		if ($cmplen > 0) {
+			$ebuf = substr($expr, $eoff, $cmplen);
+			if (substr_compare($str, $ebuf, $soff, $cmplen) !== 0) {
+				$ret = false;
+				break;
+			}
+		}
+		/* bump offsets */
+		$eoff = $enew + 1;
+		$soff = $snew;
+	} while ($aspos !== false);
+	$cache[$expr][$str] = $ret;
+	return $ret;
+}
 
 function chkip($base, $mask, $chk) {
 	if (strpos($mask, ".") === false) {
