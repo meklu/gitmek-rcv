@@ -783,7 +783,7 @@ function fmt_payload_pullrequest($payload, $config, $fmt) {
 	}
 	$privmsg.= sprintf(
 		": %s. See %s",
-		brief_message($payload["issue"], $config["commitmsglen"]),
+		brief_message($payload["title"], $config["commitmsglen"]),
 		$fmt["url"]($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
 	);
 	return $privmsg;
