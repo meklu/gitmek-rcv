@@ -320,7 +320,6 @@ function process_gh_issue($payload) {
 	return array(
 		"type"		=> GITHUB_T,
 		"event"		=> "issue",
-		"ts"		=> strtotime($payload["issue"]["created_at"]),
 		"url"		=> $payload["issue"]["html_url"],
 		"actor"		=> $payload["sender"]["login"],
 		"repo"		=> $payload["repository"]["full_name"],
@@ -334,7 +333,6 @@ function process_gh_issuecomment($payload) {
 	return array(
 		"type"		=> GITHUB_T,
 		"event"		=> "issuecomment",
-		"ts"		=> strtotime($payload["comment"]["created_at"]),
 		"url"		=> $payload["comment"]["html_url"],
 		"actor"		=> $payload["sender"]["login"],
 		"repo"		=> $payload["repository"]["full_name"],
@@ -348,7 +346,6 @@ function process_gh_pullrequest($payload) {
 	return array(
 		"type"		=> GITHUB_T,
 		"event"		=> "pullrequest",
-		"ts"		=> strtotime($payload["pull_request"]["created_at"]),
 		"url"		=> $payload["pull_request"]["html_url"],
 		"actor"		=> $payload["sender"]["login"],
 		"repo"		=> $payload["repository"]["full_name"],
@@ -743,9 +740,6 @@ function fmt_payload_issue($payload, $config, $fmt) {
 		$fmt["action"]($payload["action"]),
 		$fmt["issue"]("#" . $payload["number"])
 	);
-	if ($config["notime"] === false) {
-		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
-	}
 	$privmsg.= sprintf(
 		": %s. See %s",
 		brief_message($payload["issue"], $config["commitmsglen"]),
@@ -762,9 +756,6 @@ function fmt_payload_issuecomment($payload, $config, $fmt) {
 		$fmt["name"]($payload["actor"]),
 		$fmt["issue"]("#" . $payload["number"])
 	);
-	if ($config["notime"] === false) {
-		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
-	}
 	$privmsg.= sprintf(
 		": %s. See %s",
 		brief_message($payload["issue"], $config["commitmsglen"]),
@@ -782,9 +773,6 @@ function fmt_payload_pullrequest($payload, $config, $fmt) {
 		$fmt["action"]($payload["action"]),
 		$fmt["issue"]("#" . $payload["number"])
 	);
-	if ($config["notime"] === false) {
-		$privmsg.= strftime(" on %Y-%m-%d at %H:%I:%S %Z", $payload["ts"]);
-	}
 	$privmsg.= sprintf(
 		": %s. See %s",
 		brief_message($payload["title"], $config["commitmsglen"]),
