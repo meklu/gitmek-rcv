@@ -93,6 +93,8 @@ function getsend($payload) {
 			}
 		}
 		if (count($ret) > 0) {
+			/* remove duplicates */
+			$ret = array_flip(array_flip($ret));
 			/* try to look clean */
 			if (count($ret) === 1) {
 				return $ret[0];
