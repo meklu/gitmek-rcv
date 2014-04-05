@@ -266,6 +266,8 @@ function process_gh($payload) {
 		return process_gh_issuecomment($payload);
 	} else if ($event === "pull_request") {
 		return process_gh_pullrequest($payload);
+	} else {
+		mekdie("Unsupported event type '$event'!");
 	}
 }
 
