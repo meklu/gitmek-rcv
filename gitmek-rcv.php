@@ -347,7 +347,7 @@ function process_gh_pullrequest($payload) {
 		"type"		=> GITHUB_T,
 		"event"		=> "pullrequest",
 		"ts"		=> strtotime($payload["pull_request"]["created_at"]),
-		"url"		=> $payload["issue"]["html_url"],
+		"url"		=> $payload["pull_request"]["html_url"],
 		"actor"		=> $payload["sender"]["login"],
 		"repo"		=> $payload["repository"]["full_name"],
 		"title"		=> $payload["pull_request"]["title"],
