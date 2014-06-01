@@ -95,10 +95,6 @@ function getsend($payload) {
 		if (count($ret) > 0) {
 			/* remove duplicates and reset indices */
 			$ret = array_values(array_flip(array_flip($ret)));
-			/* try to look clean */
-			if (count($ret) === 1) {
-				return $ret[0];
-			}
 			return $ret;
 		}
 	}
