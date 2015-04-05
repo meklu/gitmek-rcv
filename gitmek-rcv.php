@@ -341,7 +341,7 @@ function process_gh_issuecomment($payload) {
 }
 
 function process_gh_ping($payload) {
-	// we make a URL here because hook has no html_url
+	/* we make a URL here because hook has no html_url */
 	return array(
 		"type"		=> GITHUB_T,
 		"event"		=> "ping",
