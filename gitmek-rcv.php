@@ -262,6 +262,8 @@ function process_gh($payload) {
 		return process_gh_issuecomment($payload);
 	} else if ($event === "pull_request") {
 		return process_gh_pullrequest($payload);
+	} else if ($event === "ping") {
+		return process_gh_ping($payload);
 	} else {
 		mekdie("Unsupported event type '$event'!");
 	}
@@ -335,6 +337,19 @@ function process_gh_issuecomment($payload) {
 		"issue"		=> $payload["issue"]["title"],
 		"number"	=> $payload["issue"]["number"],
 		"action"	=> $payload["action"],
+	);
+}
+
+function process_gh_ping($payload) {
+	// we make a URL here because hook has no html_url
+	return array(
+		"type"		=> GITHUB_T,
+		"event"		=> "ping",
+		"url"		=> $payload["repository"]["html_url"] . '/settings/hooks/' . $payload["hook_id"],
+		"actor"		=> $payload["sender"]["login"],
+		"repo"		=> $payload["repository"]["name"],
+		"title"		=> $payload["zen"],
+		"number"	=> $payload["hook_id"],
 	);
 }
 
@@ -755,6 +770,17 @@ function fmt_payload_issuecomment($payload, $config, $fmt) {
 	$privmsg.= sprintf(
 		": %s. See %s",
 		brief_message($payload["issue"], $config["commitmsglen"]),
+		$fmt["url"]($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
+	);
+	return $privmsg;
+}
+
+function fmt_payload_ping($payload, $config, $fmt) {
+	$privmsg = "";
+	/* process */
+	$privmsg.= sprintf(
+		"%s triggered a ping. See %s",
+		$fmt["name"]($payload["actor"]),
 		$fmt["url"]($config["shorten"] ? shorten_url($payload["url"]) : $payload["url"])
 	);
 	return $privmsg;
