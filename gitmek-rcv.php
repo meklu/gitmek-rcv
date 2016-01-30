@@ -347,7 +347,7 @@ function process_gh_ping($payload) {
 		"event"		=> "ping",
 		"url"		=> $payload["repository"]["html_url"] . '/settings/hooks/' . $payload["hook_id"],
 		"actor"		=> $payload["sender"]["login"],
-		"repo"		=> $payload["repository"]["name"],
+		"repo"		=> $payload["repository"]["full_name"],
 		"title"		=> $payload["zen"],
 		"number"	=> $payload["hook_id"],
 	);
