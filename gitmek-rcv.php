@@ -588,24 +588,14 @@ function shorten_url($url) {
 		),
 	);
 	$ctx = stream_context_create($opts);
-	$stream = @fopen("http://git.io", "r", false, $ctx);
+	$stream = @fopen("https://git.io/create", "r", false, $ctx);
 	if ($stream === false) {
-		/* damn it */
+		/* damn it:*/
 		return $url;
 	}
-	$md = stream_get_meta_data($stream);
+	$body = stream_get_contents($stream);
 	fclose($stream);
-	$headers = $md["wrapper_data"];
-	foreach($headers as $header) {
-		static $key = "Location: ";
-		if (strpos($header, $key) === 0) {
-			$ret = substr($header, strlen($key));
-			$cache[$url] = $ret;
-			return $ret;
-		}
-	}
-	/* when all else fails, be stupid */
-	return $url;
+	return "https://git.io/$body";
 }
 
 function strip_org($repo) {
