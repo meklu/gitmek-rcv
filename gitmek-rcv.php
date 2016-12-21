@@ -199,7 +199,7 @@ function wild($str, $expr) {
 		} else {
 			$enew = $aspos;
 			$delim = substr($expr, $aspos + 1, 1);
-			if ($delim === false) {
+			if ($delim === false || $delim === "") {
 				$snew = strlen($str);
 			} else {
 				$snew = strpos($str, $delim, $soff);
