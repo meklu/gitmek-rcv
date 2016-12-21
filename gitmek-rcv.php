@@ -106,11 +106,12 @@ function getconfig($target) {
 	if (!isset($targetconfig)) {
 		return $config;
 	}
-	$tmp = array();
 	if (isset($targetconfig[$target])) {
+		$tmp = array();
 		$tmp = array_merge($config, $targetconfig[$target]);
+		return $tmp;
 	}
-	return $tmp;
+	return $config;
 }
 
 if (isset($_GET["type"])) {
