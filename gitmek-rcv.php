@@ -671,18 +671,18 @@ function fmt_payload_commit($payload, $config, $fmt) {
 	if (isset($maxcommits) && $cmt_count > $maxcommits) {
 		if ($maxcommits < 0) {
 			/* unlimited */
-			break;
-		}
-		array_splice(
-			$payload["commits"],
-			0,
-			- $maxcommits
-		);
-		if ($maxcommits > 0) {
-			$cmt_truncmsg = sprintf(
-				" (truncated to %s)",
-				$fmt["count"]($maxcommits)
+		} else {
+			array_splice(
+				$payload["commits"],
+				0,
+				- $maxcommits
 			);
+			if ($maxcommits > 0) {
+				$cmt_truncmsg = sprintf(
+					" (truncated to %s)",
+					$fmt["count"]($maxcommits)
+				);
+			}
 		}
 	}
 	if ($payload["pusher"] !== false) {
