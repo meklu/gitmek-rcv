@@ -1,5 +1,5 @@
 <?php
-/* copyleft 2013-2014 meklu (public domain)
+/* copyleft 2013-2017 meklu (public domain)
  *
  * any and all re-distributions and/or modifications
  * should or should not include this disclaimer
@@ -752,9 +752,16 @@ function fmt_payload_issue($payload, $config, $fmt) {
 
 function fmt_payload_issuecomment($payload, $config, $fmt) {
 	$privmsg = "";
+	$action = "";
 	/* process */
+	if (!isset($payload["action"]) || $payload["action"] == "created") {
+		$action = "commented";
+	} else {
+		$action = sprintf("%s a comment", $payload["action"]);
+	}
 	$privmsg.= sprintf(
-		"%s commented on issue %s",
+		"%s %s on issue %s",
+		$action,
 		$fmt["name"]($payload["actor"]),
 		$fmt["issue"]("#" . $payload["number"])
 	);
