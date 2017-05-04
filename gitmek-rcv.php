@@ -761,8 +761,8 @@ function fmt_payload_issuecomment($payload, $config, $fmt) {
 	}
 	$privmsg.= sprintf(
 		"%s %s on issue %s",
-		$action,
 		$fmt["name"]($payload["actor"]),
+		$action,
 		$fmt["issue"]("#" . $payload["number"])
 	);
 	$privmsg.= sprintf(
